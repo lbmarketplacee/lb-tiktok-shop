@@ -1,0 +1,6 @@
+{
+  "name": "lb-tiktok-shop",
+  "version": "1.0.0",
+  "description": "Integração LB com TikTok Shop API (GMV, Cupons)",
+  "private": true
+}
