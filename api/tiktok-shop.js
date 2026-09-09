@@ -55,9 +55,11 @@ export default async function handler(req, res) {
     const params = req.method === 'GET' ? req.query : req.body;
     const { acao } = params;
 
-    // Gera o link de autorização pra o lojista conectar a loja dele
+    // Gera o link de autorização pra o lojista conectar a loja dele (identifica o cliente via "state")
     if (acao === 'gerar_link_autorizacao') {
-      const url = `${AUTH_URL}/oauth/authorize?app_key=${appKey}&state=lb&redirect_uri=${encodeURIComponent(redirectUri)}`;
+      const { clienteId } = params;
+      if (!clienteId) return res.status(400).json({ erro: 'clienteId é obrigatório.' });
+      const url = `${AUTH_URL}/oauth/authorize?app_key=${appKey}&state=${encodeURIComponent(clienteId)}&redirect_uri=${encodeURIComponent(redirectUri)}`;
       return res.status(200).json({ ok: true, url });
     }
 
