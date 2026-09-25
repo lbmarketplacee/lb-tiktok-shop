@@ -23,7 +23,9 @@ async function chamarTiktok(path, params = {}, metodo = 'GET', body = null, acce
   const appSecret = process.env.TIKTOK_APP_SECRET;
   const timestamp = Math.floor(Date.now() / 1000);
 
-  const todosParams = { app_key: appKey, timestamp: String(timestamp), ...params };
+  // A TikTok exige "version" como parâmetro comum em toda chamada (faltava aqui — causava "invalid sign")
+  const todosParams = { app_key: appKey, timestamp: String(timestamp), version: '202309', ...params };
+  if (accessToken) todosParams.access_token = accessToken; // também entra na URL, além do header
   const sign = assinarRequisicao(path, todosParams, appSecret);
 
   const query = new URLSearchParams({ ...todosParams, sign }).toString();
