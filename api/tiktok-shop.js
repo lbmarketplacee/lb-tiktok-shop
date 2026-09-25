@@ -104,13 +104,10 @@ export default async function handler(req, res) {
       let gmvTotal = 0, totalPedidos = 0, pageToken = '';
       let seguir = true;
       while (seguir) {
-        const bodyBusca = {
-          create_time_ge: timeFromTotal,
-          create_time_lt: timeToTotal,
-          page_size: 50,
-          ...(pageToken ? { page_token: pageToken } : {})
-        };
-        const resultado = await chamarTiktok(path, { shop_id, shop_cipher }, 'POST', bodyBusca, access_token);
+        // page_size e page_token vão na URL (parâmetros comuns) — só os filtros de data vão no corpo
+        const queryParams = { shop_id, shop_cipher, page_size: '50', ...(pageToken ? { page_token: pageToken } : {}) };
+        const bodyBusca = { create_time_ge: timeFromTotal, create_time_lt: timeToTotal };
+        const resultado = await chamarTiktok(path, queryParams, 'POST', bodyBusca, access_token);
         if (resultado.code !== 0) return res.status(200).json({ ok: false, erro: resultado.message || 'Erro ao buscar pedidos.' });
 
         const pedidos = resultado.data?.orders || [];
