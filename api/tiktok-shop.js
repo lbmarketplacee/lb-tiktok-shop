@@ -31,6 +31,11 @@ async function chamarTiktok(path, params = {}, metodo = 'GET', body = null, acce
   const query = new URLSearchParams({ ...todosParams, sign }).toString();
   const url = `${BASE_URL}${path}?${query}`;
 
+  if (params.__debug_sign) {
+    const chavesOrdenadas = Object.keys(todosParams).filter(k => k !== 'sign' && k !== 'access_token' && k !== '__debug_sign').sort();
+    return { code: -999, debug_base_string_sem_segredo: `[SEGREDO]${path}${chavesOrdenadas.map(k => k + '=' + todosParams[k]).join('')}[SEGREDO]`, debug_url: url, debug_params_ordenados: chavesOrdenadas };
+  }
+
   const headers = { 'Content-Type': 'application/json' };
   if (accessToken) headers['x-tts-access-token'] = accessToken;
 
@@ -94,7 +99,7 @@ export default async function handler(req, res) {
 
     // Busca o GMV (soma dos pedidos) num período, pra um shop_id + shop_cipher + access_token específicos
     if (acao === 'buscar_gmv') {
-      const { access_token, shop_id, shop_cipher, data_inicio, data_fim } = params;
+      const { access_token, shop_id, shop_cipher, data_inicio, data_fim, __debug_sign } = params;
       if (!access_token || !shop_id || !shop_cipher) return res.status(400).json({ erro: 'access_token, shop_id e shop_cipher são obrigatórios.' });
 
       const path = '/order/202309/orders/search';
@@ -105,9 +110,10 @@ export default async function handler(req, res) {
       let seguir = true;
       while (seguir) {
         // page_size e page_token vão na URL (parâmetros comuns) — só os filtros de data vão no corpo
-        const queryParams = { shop_id, shop_cipher, page_size: '50', ...(pageToken ? { page_token: pageToken } : {}) };
+        const queryParams = { shop_id, shop_cipher, page_size: '50', ...(pageToken ? { page_token: pageToken } : {}), ...(__debug_sign ? { __debug_sign: '1' } : {}) };
         const bodyBusca = { create_time_ge: timeFromTotal, create_time_lt: timeToTotal };
         const resultado = await chamarTiktok(path, queryParams, 'POST', bodyBusca, access_token);
+        if (__debug_sign) return res.status(200).json(resultado);
         if (resultado.code !== 0) return res.status(200).json({ ok: false, erro: resultado.message || 'Erro ao buscar pedidos.' });
 
         const pedidos = resultado.data?.orders || [];
