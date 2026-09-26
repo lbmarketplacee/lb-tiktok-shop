@@ -48,7 +48,11 @@ async function chamarTiktok(
     todosParams.access_token = accessToken;
   }
 
-  const sign = assinarRequisicao(path, todosParams, appSecret);
+  const sign = assinarRequisicao(
+    path,
+    todosParams,
+    appSecret
+  );
 
   const query = new URLSearchParams({
     ...todosParams,
@@ -78,7 +82,9 @@ async function chamarTiktok(
 
   if (params.__debug_sign) {
     const chavesOrdenadas = Object.keys(todosParams)
-      .filter(k => k !== 'sign' && k !== '__debug_sign')
+      .filter(
+        k => k !== 'sign' && k !== '__debug_sign'
+      )
       .sort();
 
     resultado.__debug = {
@@ -86,7 +92,9 @@ async function chamarTiktok(
       sign,
       base_sem_segredo:
         `[SEGREDO]${path}` +
-        `${chavesOrdenadas.map(k => k + todosParams[k]).join('')}` +
+        `${chavesOrdenadas
+          .map(k => k + todosParams[k])
+          .join('')}` +
         `[SEGREDO]`
     };
   }
@@ -100,11 +108,16 @@ export default async function handler(req, res) {
     'no-store, no-cache, must-revalidate'
   );
 
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader(
+    'Access-Control-Allow-Origin',
+    '*'
+  );
+
   res.setHeader(
     'Access-Control-Allow-Methods',
     'GET, POST, OPTIONS'
   );
+
   res.setHeader(
     'Access-Control-Allow-Headers',
     'Content-Type'
@@ -114,18 +127,28 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-  const appKey = (process.env.TIKTOK_APP_KEY || '').trim();
-  const appSecret = (process.env.TIKTOK_APP_SECRET || '').trim();
-  const redirectUri = (process.env.TIKTOK_REDIRECT_URI || '').trim();
+  const appKey =
+    (process.env.TIKTOK_APP_KEY || '').trim();
+
+  const appSecret =
+    (process.env.TIKTOK_APP_SECRET || '').trim();
+
+  const redirectUri =
+    (process.env.TIKTOK_REDIRECT_URI || '').trim();
 
   if (!appKey || !appSecret) {
     return res.status(500).json({
-      erro: 'Credenciais do TikTok Shop não configuradas na Vercel.'
+      erro:
+        'Credenciais do TikTok Shop não configuradas na Vercel.'
     });
   }
 
   try {
-    const params = req.method === 'GET' ? req.query : req.body;
+    const params =
+      req.method === 'GET'
+        ? req.query
+        : req.body;
+
     const { acao } = params;
 
     // Diagnóstico
@@ -135,10 +158,14 @@ export default async function handler(req, res) {
         appKey_tamanho: appKey.length,
         appKey_valor: appKey,
         appSecret_tamanho: appSecret.length,
-        appSecret_primeiros3: appSecret.slice(0, 3),
-        appSecret_ultimos3: appSecret.slice(-3),
-        horario_servidor: new Date().toISOString(),
-        timestamp_unix: Math.floor(Date.now() / 1000)
+        appSecret_primeiros3:
+          appSecret.slice(0, 3),
+        appSecret_ultimos3:
+          appSecret.slice(-3),
+        horario_servidor:
+          new Date().toISOString(),
+        timestamp_unix:
+          Math.floor(Date.now() / 1000)
       });
     }
 
@@ -156,7 +183,9 @@ export default async function handler(req, res) {
         `${AUTH_URL}/oauth/authorize?` +
         `app_key=${appKey}` +
         `&state=${encodeURIComponent(clienteId)}` +
-        `&redirect_uri=${encodeURIComponent(redirectUri)}`;
+        `&redirect_uri=${encodeURIComponent(
+          redirectUri
+        )}`;
 
       return res.status(200).json({
         ok: true,
@@ -187,12 +216,16 @@ export default async function handler(req, res) {
       if (data.code !== 0) {
         return res.status(200).json({
           ok: false,
-          erro: data.message || 'Falha ao trocar o código.'
+          erro:
+            data.message ||
+            'Falha ao trocar o código.'
         });
       }
 
-      const accessToken = data.data.access_token;
+      const accessToken =
+        data.data.access_token;
 
+      // Busca as lojas autorizadas
       const lojas = await chamarTiktok(
         '/authorization/202309/shops',
         {},
@@ -201,12 +234,65 @@ export default async function handler(req, res) {
         accessToken
       );
 
-      const listaLojas = lojas?.data?.shops || [];
+      const listaLojas =
+        lojas?.data?.shops || [];
 
+      // DIAGNÓSTICO:
+      // Se não encontrar loja, mostra a resposta
+      // da TikTok sem expor access_token ou app_secret.
       if (!listaLojas.length) {
         return res.status(200).json({
           ok: false,
-          erro: 'Token obtido, mas nenhuma loja autorizada foi encontrada.'
+          etapa: 'buscar_lojas',
+
+          erro:
+            'Token obtido, mas nenhuma loja autorizada foi encontrada.',
+
+          token_obtido: !!accessToken,
+
+          token_expira_em:
+            data.data.access_token_expire_in ||
+            null,
+
+          granted_scopes:
+            data.data.granted_scopes ||
+            data.data.scope ||
+            [],
+
+          user_id:
+            data.data.user_id ||
+            null,
+
+          resposta_tiktok_lojas: {
+            http_status:
+              lojas?.http_status ?? null,
+
+            code:
+              lojas?.code ?? null,
+
+            message:
+              lojas?.message ?? null,
+
+            request_id:
+              lojas?.request_id ?? null,
+
+            data: lojas?.data
+              ? {
+                  shops_count:
+                    Array.isArray(
+                      lojas.data.shops
+                    )
+                      ? lojas.data.shops.length
+                      : 0,
+
+                  has_shops_field:
+                    Object.prototype.hasOwnProperty.call(
+                      lojas.data,
+                      'shops'
+                    )
+                }
+              : null
+          }
         });
       }
 
@@ -217,10 +303,14 @@ export default async function handler(req, res) {
 
         // Credenciais
         access_token: accessToken,
-        refresh_token: data.data.refresh_token,
-        expires_in: data.data.access_token_expire_in,
 
-        // NOVO: informações de diagnóstico
+        refresh_token:
+          data.data.refresh_token,
+
+        expires_in:
+          data.data.access_token_expire_in,
+
+        // Diagnóstico
         granted_scopes:
           data.data.granted_scopes ||
           data.data.scope ||
@@ -232,7 +322,9 @@ export default async function handler(req, res) {
 
         // Loja
         shop_id: loja.id,
+
         shop_cipher: loja.cipher,
+
         shop_name: loja.name
       });
     }
@@ -248,22 +340,31 @@ export default async function handler(req, res) {
         __debug_sign
       } = params;
 
-      if (!access_token || !shop_id || !shop_cipher) {
+      if (
+        !access_token ||
+        !shop_id ||
+        !shop_cipher
+      ) {
         return res.status(400).json({
           erro:
             'access_token, shop_id e shop_cipher são obrigatórios.'
         });
       }
 
-      const path = '/order/202309/orders/search';
+      const path =
+        '/order/202309/orders/search';
 
-      const timeFromTotal = Math.floor(
-        new Date(data_inicio).getTime() / 1000
-      );
+      const timeFromTotal =
+        Math.floor(
+          new Date(data_inicio).getTime() /
+            1000
+        );
 
-      const timeToTotal = Math.floor(
-        new Date(data_fim).getTime() / 1000
-      );
+      const timeToTotal =
+        Math.floor(
+          new Date(data_fim).getTime() /
+            1000
+        );
 
       let gmvTotal = 0;
       let totalPedidos = 0;
@@ -275,29 +376,37 @@ export default async function handler(req, res) {
           shop_id,
           shop_cipher,
           page_size: '50',
+
           ...(pageToken
             ? { page_token: pageToken }
             : {}),
+
           ...(__debug_sign
             ? { __debug_sign: '1' }
             : {})
         };
 
         const bodyBusca = {
-          create_time_ge: timeFromTotal,
-          create_time_lt: timeToTotal
+          create_time_ge:
+            timeFromTotal,
+
+          create_time_lt:
+            timeToTotal
         };
 
-        const resultado = await chamarTiktok(
-          path,
-          queryParams,
-          'POST',
-          bodyBusca,
-          access_token
-        );
+        const resultado =
+          await chamarTiktok(
+            path,
+            queryParams,
+            'POST',
+            bodyBusca,
+            access_token
+          );
 
         if (__debug_sign) {
-          return res.status(200).json(resultado);
+          return res
+            .status(200)
+            .json(resultado);
         }
 
         if (resultado.code !== 0) {
@@ -321,7 +430,8 @@ export default async function handler(req, res) {
         });
 
         pageToken =
-          resultado.data?.next_page_token || '';
+          resultado.data
+            ?.next_page_token || '';
 
         seguir = !!pageToken;
       }
@@ -345,14 +455,21 @@ export default async function handler(req, res) {
         duracao_dias
       } = params;
 
-      if (!access_token || !shop_id || !shop_cipher) {
+      if (
+        !access_token ||
+        !shop_id ||
+        !shop_cipher
+      ) {
         return res.status(400).json({
           erro:
             'access_token, shop_id e shop_cipher são obrigatórios.'
         });
       }
 
-      if (!produtos || !produtos.length) {
+      if (
+        !produtos ||
+        !produtos.length
+      ) {
         return res.status(400).json({
           erro:
             'produtos (lista de product_id) é obrigatório.'
@@ -364,17 +481,23 @@ export default async function handler(req, res) {
 
       const dias =
         tipo === 'FLASH_SALE'
-          ? Math.min(duracao_dias || 3, 3)
+          ? Math.min(
+              duracao_dias || 3,
+              3
+            )
           : duracao_dias || 90;
 
       const fim =
-        agora + dias * 24 * 60 * 60;
+        agora +
+        dias * 24 * 60 * 60;
 
       const corpo = {
         title:
-          `${tipo === 'FLASH_SALE'
-            ? 'Oferta Relâmpago'
-            : 'Desconto'} - LB Marketplace`,
+          `${
+            tipo === 'FLASH_SALE'
+              ? 'Oferta Relâmpago'
+              : 'Desconto'
+          } - LB Marketplace`,
 
         activity_type: tipo,
 
@@ -384,44 +507,57 @@ export default async function handler(req, res) {
 
         end_time: fim,
 
-        products: produtos.map(p => ({
-          product_id: p.product_id,
+        products:
+          produtos.map(p => ({
+            product_id:
+              p.product_id,
 
-          discount: {
-            type: 'PERCENTAGE_OFF',
-            percentage: percentual || 5
-          }
-        }))
+            discount: {
+              type:
+                'PERCENTAGE_OFF',
+
+              percentage:
+                percentual || 5
+            }
+          }))
       };
 
-      const resultado = await chamarTiktok(
-        '/promotion/202309/activities',
-        {
-          shop_id,
-          shop_cipher
-        },
-        'POST',
-        corpo,
-        access_token
-      );
+      const resultado =
+        await chamarTiktok(
+          '/promotion/202309/activities',
+          {
+            shop_id,
+            shop_cipher
+          },
+          'POST',
+          corpo,
+          access_token
+        );
 
       if (resultado.code !== 0) {
         return res.status(200).json({
           ok: false,
+
           erro:
             resultado.message ||
             'Erro ao criar promoção.',
+
           debug: resultado,
+
           corpoEnviado: corpo
         });
       }
 
       return res.status(200).json({
         ok: true,
+
         activity_id:
           resultado.data?.activity_id,
+
         inicio: agora,
+
         fim,
+
         debug: resultado
       });
     }
