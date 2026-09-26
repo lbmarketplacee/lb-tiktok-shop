@@ -67,6 +67,17 @@ export default async function handler(req, res) {
     const { acao } = params;
 
     // Gera o link de autorização pra o lojista conectar a loja dele (identifica o cliente via "state")
+    if (acao === 'diagnostico') {
+      return res.status(200).json({
+        ok: true,
+        appKey_tamanho: appKey.length,
+        appKey_valor: appKey,
+        appSecret_tamanho: appSecret.length,
+        appSecret_primeiros3: appSecret.slice(0, 3),
+        appSecret_ultimos3: appSecret.slice(-3)
+      });
+    }
+
     if (acao === 'gerar_link_autorizacao') {
       const { clienteId } = params;
       if (!clienteId) return res.status(400).json({ erro: 'clienteId é obrigatório.' });
