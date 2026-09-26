@@ -37,6 +37,10 @@ async function chamarTiktok(path, params = {}, metodo = 'GET', body = null, acce
   const headers = { 'Content-Type': 'application/json' };
   if (accessToken) headers['x-tts-access-token'] = accessToken;
 
+  console.log('[TikTok] URL final:', url);
+  console.log('[TikTok] Sign:', sign);
+  console.log('[TikTok] Base assinada:', `${path}${Object.keys(todosParams).filter(k=>k!=='sign'&&k!=='__debug_sign').sort().map(k=>k+todosParams[k]).join('')}`);
+
   const resp = await fetch(url, {
     method: metodo,
     headers,
@@ -74,7 +78,9 @@ export default async function handler(req, res) {
         appKey_valor: appKey,
         appSecret_tamanho: appSecret.length,
         appSecret_primeiros3: appSecret.slice(0, 3),
-        appSecret_ultimos3: appSecret.slice(-3)
+        appSecret_ultimos3: appSecret.slice(-3),
+        horario_servidor: new Date().toISOString(),
+        timestamp_unix: Math.floor(Date.now() / 1000)
       });
     }
 
