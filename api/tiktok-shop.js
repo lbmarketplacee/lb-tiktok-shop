@@ -20,8 +20,10 @@ function assinarRequisicao(path, params, appSecret) {
 }
 
 async function chamarTiktok(path, params = {}, metodo = 'GET', body = null, accessToken = null) {
-  const appKey = process.env.TIKTOK_APP_KEY;
-  const appSecret = process.env.TIKTOK_APP_SECRET;
+  // .trim() por segurança — espaço/quebra de linha escondido ao colar na Vercel já causou
+  // "sign inválido" antes, mesmo com a fórmula certa.
+  const appKey = (process.env.TIKTOK_APP_KEY || '').trim();
+  const appSecret = (process.env.TIKTOK_APP_SECRET || '').trim();
   const timestamp = Math.floor(Date.now() / 1000);
 
   // A TikTok exige "version" como parâmetro comum em toda chamada (faltava aqui — causava "invalid sign")
@@ -55,9 +57,9 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  const appKey = process.env.TIKTOK_APP_KEY;
-  const appSecret = process.env.TIKTOK_APP_SECRET;
-  const redirectUri = process.env.TIKTOK_REDIRECT_URI;
+  const appKey = (process.env.TIKTOK_APP_KEY || '').trim();
+  const appSecret = (process.env.TIKTOK_APP_SECRET || '').trim();
+  const redirectUri = (process.env.TIKTOK_REDIRECT_URI || '').trim();
   if (!appKey || !appSecret) return res.status(500).json({ erro: 'Credenciais do TikTok Shop não configuradas na Vercel.' });
 
   try {
