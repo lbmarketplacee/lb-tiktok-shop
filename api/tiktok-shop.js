@@ -9,7 +9,8 @@ const AUTH_URL = 'https://auth.tiktok-shops.com';
 // Assina a requisição no formato exato exigido pela TikTok Shop:
 // HMAC-SHA256(appSecret + path + params_ordenados_concatenados + appSecret, chave=appSecret)
 function assinarRequisicao(path, params, appSecret) {
-  const chavesOrdenadas = Object.keys(params).filter(k => k !== 'sign' && k !== 'access_token').sort();
+  // access_token ENTRA na assinatura (confirmado com um exemplo real que funcionou) — só "sign" fica de fora
+  const chavesOrdenadas = Object.keys(params).filter(k => k !== 'sign' && k !== '__debug_sign').sort();
   let base = appSecret + path;
   for (const chave of chavesOrdenadas) {
     base += chave + params[chave];
@@ -32,7 +33,7 @@ async function chamarTiktok(path, params = {}, metodo = 'GET', body = null, acce
   const url = `${BASE_URL}${path}?${query}`;
 
   if (params.__debug_sign) {
-    const chavesOrdenadas = Object.keys(todosParams).filter(k => k !== 'sign' && k !== 'access_token' && k !== '__debug_sign').sort();
+    const chavesOrdenadas = Object.keys(todosParams).filter(k => k !== 'sign' && k !== '__debug_sign').sort();
     return { code: -999, debug_base_string_sem_segredo: `[SEGREDO]${path}${chavesOrdenadas.map(k => k + '=' + todosParams[k]).join('')}[SEGREDO]`, debug_url: url, debug_params_ordenados: chavesOrdenadas };
   }
 
