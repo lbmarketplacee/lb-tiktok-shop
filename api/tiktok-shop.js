@@ -50,6 +50,7 @@ async function chamarTiktok(path, params = {}, metodo = 'GET', body = null, acce
     body: body ? JSON.stringify(body) : undefined
   });
   const resultado = await resp.json();
+  resultado.http_status = resp.status; // a tela de diagnóstico mostra isso — a TikTok não manda no corpo
 
   if (params.__debug_sign) {
     const chavesOrdenadas = Object.keys(todosParams).filter(k => k !== 'sign' && k !== '__debug_sign').sort();
@@ -103,21 +104,39 @@ export default async function handler(req, res) {
       if (!code) return res.status(400).json({ erro: 'code é obrigatório.' });
       const resp = await fetch(`${AUTH_URL}/api/v2/token/get?app_key=${appKey}&app_secret=${appSecret}&auth_code=${code}&grant_type=authorized_code`);
       const data = await resp.json();
-      if (data.code !== 0) return res.status(200).json({ ok: false, erro: data.message || 'Falha ao trocar o código.' });
+      if (data.code !== 0) {
+        // Falhou ANTES de ter token nenhum — a tela de diagnóstico espera esses nomes de campo exatos.
+        return res.status(200).json({
+          ok: false, etapa: 'trocar_codigo', token_obtido: false,
+          erro: data.message || 'Falha ao trocar o código.',
+          resposta_tiktok_lojas: { code: data.code, message: data.message, http_status: resp.status, request_id: data.request_id }
+        });
+      }
 
       const accessToken = data.data.access_token;
+      const grantedScopes = data.data.scope || data.data.granted_scopes || null; // nome do campo varia conforme a doc/versão
+      const userId = data.data.open_id || data.data.user_id || null;
+      const expiraEm = data.data.access_token_expire_in || null;
+
       // __debug_sign sempre ligado aqui (não vaza o segredo — só a base sem ele) — assim, se essa
       // chamada falhar, a resposta já vem com o motivo exato, sem precisar de um 2º teste manual.
       const lojas = await chamarTiktok('/authorization/202309/shops', { __debug_sign: '1' }, 'GET', null, accessToken);
       const listaLojas = lojas?.data?.shops || [];
-      if (!listaLojas.length) return res.status(200).json({ ok: false, erro: lojas?.message || 'Token obtido, mas nenhuma loja autorizada foi encontrada.', etapa: 'buscar_lojas', resposta_tiktok: lojas });
+      if (!listaLojas.length) {
+        return res.status(200).json({
+          ok: false, etapa: 'buscar_lojas', token_obtido: true,
+          erro: lojas?.message || 'Token obtido, mas nenhuma loja autorizada foi encontrada.',
+          resposta_tiktok_lojas: lojas,
+          granted_scopes: grantedScopes, user_id: userId, token_expira_em: expiraEm
+        });
+      }
       const loja = listaLojas[0]; // LB conecta 1 loja por cliente — pega a primeira
 
       return res.status(200).json({
         ok: true,
         access_token: accessToken,
         refresh_token: data.data.refresh_token,
-        expires_in: data.data.access_token_expire_in,
+        expires_in: expiraEm,
         shop_id: loja.id,
         shop_cipher: loja.cipher,
         shop_name: loja.name
