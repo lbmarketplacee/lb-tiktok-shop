@@ -9,8 +9,11 @@ const AUTH_URL = 'https://auth.tiktok-shops.com';
 // Assina a requisição no formato exato exigido pela TikTok Shop:
 // HMAC-SHA256(appSecret + path + params_ordenados_concatenados + appSecret, chave=appSecret)
 function assinarRequisicao(path, params, appSecret) {
-  // access_token ENTRA na assinatura (confirmado com um exemplo real que funcionou) — só "sign" fica de fora
-  const chavesOrdenadas = Object.keys(params).filter(k => k !== 'sign' && k !== '__debug_sign').sort();
+  // TESTE 04/10: access_token agora fica DE FORA da assinatura (padrão documentado oficialmente pela
+  // TikTok — só "sign" e o próprio "access_token" ficam fora). O comentário antigo dizia o contrário
+  // ("confirmado com um exemplo real") — pode ter sido engano de sessão anterior. Se isso corrigir o
+  // erro 106001, confirma a causa; se não corrigir, volta pro código anterior (access_token incluso).
+  const chavesOrdenadas = Object.keys(params).filter(k => k !== 'sign' && k !== '__debug_sign' && k !== 'access_token').sort();
   let base = appSecret + path;
   for (const chave of chavesOrdenadas) {
     base += chave + params[chave];
@@ -42,7 +45,7 @@ async function chamarTiktok(path, params = {}, metodo = 'GET', body = null, acce
 
   console.log('[TikTok] URL final:', url);
   console.log('[TikTok] Sign:', sign);
-  console.log('[TikTok] Base assinada:', `${path}${Object.keys(todosParams).filter(k=>k!=='sign'&&k!=='__debug_sign').sort().map(k=>k+todosParams[k]).join('')}`);
+  console.log('[TikTok] Base assinada:', `${path}${Object.keys(todosParams).filter(k=>k!=='sign'&&k!=='__debug_sign'&&k!=='access_token').sort().map(k=>k+todosParams[k]).join('')}`);
 
   const resp = await fetch(url, {
     method: metodo,
@@ -53,7 +56,7 @@ async function chamarTiktok(path, params = {}, metodo = 'GET', body = null, acce
   resultado.http_status = resp.status; // a tela de diagnóstico mostra isso — a TikTok não manda no corpo
 
   if (params.__debug_sign) {
-    const chavesOrdenadas = Object.keys(todosParams).filter(k => k !== 'sign' && k !== '__debug_sign').sort();
+    const chavesOrdenadas = Object.keys(todosParams).filter(k => k !== 'sign' && k !== '__debug_sign' && k !== 'access_token').sort();
     resultado.__debug = { url, sign, base_sem_segredo: `[SEGREDO]${path}${chavesOrdenadas.map(k => k + todosParams[k]).join('')}[SEGREDO]` };
   }
   return resultado;
